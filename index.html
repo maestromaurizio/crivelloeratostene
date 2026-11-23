@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Il crivello di Eratostene</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#eef3f8;--surface:#ffffff;--ink:#1d2b3a;--muted:#5a6b7d;--line:#c9d6e3;
+  --c2:#9cc8ff;--c3:#ffc99a;--c5:#b4e8a6;--c7:#f0b6ea;--prime:#ffd23f;--one:#dfe5ec;
+  --on-color:#1d2b3a;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){--bg:#121b26;--surface:#1c2937;--ink:#eef3f8;--muted:#a3b3c4;--line:#34475a;--one:#2a3a4b}
+}
+:root[data-theme="dark"]{--bg:#121b26;--surface:#1c2937;--ink:#eef3f8;--muted:#a3b3c4;--line:#34475a;--one:#2a3a4b}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Fredoka","Trebuchet MS",system-ui,sans-serif;min-height:100vh}
+main{max-width:1100px;margin:0 auto;padding:16px}
+h1{font-size:clamp(1.5rem,3.2vw,2.3rem);margin:0 0 4px;font-weight:600}
+.sub{margin:0 0 14px;color:var(--muted);font-size:clamp(1rem,1.8vw,1.25rem)}
+.controls{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+button{font:inherit;font-weight:500;font-size:clamp(1rem,2vw,1.4rem);padding:10px 18px;border-radius:12px;border:3px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;display:flex;align-items:center;gap:8px}
+button:focus-visible{outline:4px solid var(--ink);outline-offset:2px}
+button .sw{width:22px;height:22px;border-radius:6px;border:2px solid rgba(0,0,0,.35)}
+button[aria-pressed="true"]{border-color:var(--ink)}
+button:disabled{opacity:.45;cursor:not-allowed}
+#msg{min-height:2.6em;font-size:clamp(1.05rem,2vw,1.4rem);margin:0 0 12px;padding:10px 14px;background:var(--surface);border-left:6px solid var(--line);border-radius:8px}
+#grid{display:grid;grid-template-columns:repeat(10,1fr);gap:6px}
+.cell{aspect-ratio:1.25/1;border-radius:10px;background:var(--surface);border:2px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:clamp(1.1rem,3.4vw,2.2rem);font-weight:500;color:var(--ink);position:relative;transition:background .25s}
+.cell.on{color:var(--on-color);border-color:rgba(0,0,0,.25)}
+.cell.k2{background:var(--c2)}.cell.k3{background:var(--c3)}.cell.k5{background:var(--c5)}.cell.k7{background:var(--c7)}
+.cell.one{background:var(--one);color:var(--muted)}
+.cell.ring{border:4px solid var(--ink);font-weight:600}
+.cell.prime{background:var(--prime);color:#1d2b3a;border:4px solid #1d2b3a;font-weight:600}
+.cell.cm{outline:4px dashed var(--ink);outline-offset:-7px}
+.cell.cring{outline:4px dotted var(--ink);outline-offset:-7px}
+.sub2{margin:4px 0 8px;color:var(--muted);font-size:clamp(1rem,1.8vw,1.2rem)}
+.alt button .sw{background:var(--surface);border:3px dashed var(--ink)}
+.dots{display:flex;gap:3px;height:9px;margin-top:2px}
+.dots i{width:9px;height:9px;border-radius:50%;border:1.5px solid rgba(0,0,0,.55)}
+.d2{background:#2f80ed}.d3{background:#f2800d}.d5{background:#2e9d2e}.d7{background:#b43aa8}
+.note{margin-top:12px;color:var(--muted);font-size:clamp(.95rem,1.6vw,1.15rem)}
+@media (max-width:560px){#grid{gap:3px}.dots i{width:6px;height:6px}.dots{height:6px}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Il crivello di Eratostene</h1>
+  <p class="sub">Scegli un numero: colora tutti i suoi multipli. Cosa noti?</p>
+  <div class="controls" id="controls"></div>
+  <p class="sub2">Prova anche questi: lasciano dei segni nuovi?</p>
+  <div class="controls alt" id="alt"></div>
+  <p id="msg" role="status">Premi “Multipli di 2” per cominciare.</p>
+  <div id="grid" aria-label="Tabella dei numeri da 1 a 100"></div>
+  <p class="note">Ogni pallino sotto un numero indica un colore che lo ha raggiunto. Il numero scelto resta cerchiato: non è un multiplo di sé stesso da togliere. Il numero 1 non è primo. I multipli di 4, 6, 8, 9 e 10 hanno il bordo tratteggiato.</p>
+</main>
+<script>
+(function(){
+  var P=[2,3,5,7], C=[4,6,8,9,10], active=[], alt=null, showPrimes=false;
+  var grid=document.getElementById('grid'), ctr=document.getElementById('controls'), msg=document.getElementById('msg');
+  var cells=[];
+  for(var n=1;n<=100;n++){
+    var d=document.createElement('div');d.className='cell'+(n===1?' one':'');
+    d.innerHTML='<span>'+n+'</span><div class="dots"></div>';
+    grid.appendChild(d);cells.push(d);
+  }
+  var btns={};
+  P.forEach(function(p){
+    var b=document.createElement('button');b.setAttribute('aria-pressed','false');
+    b.innerHTML='<span class="sw" style="background:var(--c'+p+')"></span>Multipli di '+p;
+    b.onclick=function(){toggle(p)};
+    ctr.appendChild(b);btns[p]=b;
+  });
+  var pb=document.createElement('button');pb.textContent='Mostra i numeri primi';pb.disabled=true;
+  pb.onclick=function(){showPrimes=!showPrimes;pb.textContent=showPrimes?'Nascondi i numeri primi':'Mostra i numeri primi';render();
+    if(showPrimes){var c=0;for(var n=2;n<=100;n++)if(isPrime(n))c++;msg.textContent='I numeri rimasti senza colore sono i numeri primi: ce ne sono '+c+' fino a 100. Hanno solo due divisori: 1 e sé stessi.'}};
+  ctr.appendChild(pb);
+  var rb=document.createElement('button');rb.textContent='Ricomincia';
+  rb.onclick=function(){active=[];alt=null;showPrimes=false;pb.textContent='Mostra i numeri primi';render();msg.textContent='Premi “Multipli di 2” per cominciare.'};
+  ctr.appendChild(rb);
+  var altBox=document.getElementById('alt'), abtns={};
+  var FACT={4:'2 × 2',6:'2 × 3',8:'2 × 2 × 2',9:'3 × 3',10:'2 × 5'};
+  C.forEach(function(c){
+    var b=document.createElement('button');b.setAttribute('aria-pressed','false');
+    b.innerHTML='<span class="sw"></span>Multipli di '+c;
+    b.onclick=function(){toggleAlt(c)};
+    altBox.appendChild(b);abtns[c]=b;
+  });
+  function toggleAlt(c){
+    if(alt===c){alt=null;msg.textContent='Hai tolto i multipli di '+c+'.';render();return}
+    alt=c;
+    var tot=Math.floor(100/c)-1, nuovi=0;
+    for(var m=2*c;m<=100;m+=c)if(!covered(m))nuovi++;
+    if(nuovi===0)msg.textContent='Multipli di '+c+': '+tot+' numeri, ma nessuno è nuovo! Hanno già tutti un colore, perché '+c+' = '+FACT[c]+'.';
+    else msg.textContent='Multipli di '+c+': '+tot+' numeri. Senza colore ne restano '+nuovi+': prova prima a colorare i multipli dei numeri primi.';
+    render();
+  }
+
+  function isPrime(n){if(n<2)return false;for(var i=2;i*i<=n;i++)if(n%i===0)return false;return true}
+  function covered(n){return P.some(function(p){return active.indexOf(p)>-1&&n!==p&&n%p===0})}
+
+  function toggle(p){
+    var i=active.indexOf(p);
+    if(i>-1){active.splice(i,1);showPrimes=false;pb.textContent='Mostra i numeri primi';msg.textContent='Hai tolto i multipli di '+p+'.';}
+    else{
+      var before=[];for(var n=2;n<=100;n++)if(covered(n))before.push(n);
+      active.push(p);
+      var tot=Math.floor(100/p)-1, nuovi=0;
+      for(var m=2*p;m<=100;m+=p)if(before.indexOf(m)<0)nuovi++;
+      msg.textContent='Multipli di '+p+': '+tot+' numeri (il '+p+' resta). Nuovi numeri colorati: '+nuovi+'.';
+    }
+    render();
+  }
+  function render(){
+    P.forEach(function(p){var on=active.indexOf(p)>-1;btns[p].setAttribute('aria-pressed',on)});
+    C.forEach(function(c){abtns[c].setAttribute('aria-pressed',alt===c)});
+    pb.disabled=active.length<P.length;
+    cells.forEach(function(c,idx){
+      var n=idx+1, cls='cell'+(n===1?' one':''), dots='';
+      var first=null;
+      P.forEach(function(p){
+        if(active.indexOf(p)>-1&&n!==p&&n%p===0){if(first===null)first=p;dots+='<i class="d'+p+'"></i>'}
+      });
+      if(first!==null)cls+=' on k'+first;
+      else if(active.indexOf(n)>-1)cls+=' ring';
+      if(alt!==null&&!showPrimes){if(n===alt)cls+=' cring';else if(n%alt===0)cls+=' cm'}
+      if(showPrimes&&isPrime(n))cls=' cell prime';
+      c.className=cls;
+      c.querySelector('.dots').innerHTML=dots;
+    });
+  }
+  render();
+})();
+</script>
+</body>
+</html>
